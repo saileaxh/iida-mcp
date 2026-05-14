@@ -39,6 +39,12 @@ def _get_batch_fn():
     return _batch_fn
 
 
+# Max seconds to wait for IDA main thread to run the callback.
+# If exceeded, the request fails fast instead of leaking the handler thread
+# (otherwise the HTTP server stays in CLOSE_WAIT forever and exhausts backlog).
+IDA_SYNC_TIMEOUT = 60.0
+
+
 def run_in_ida(fn, *args, write=False):
     """Execute fn(*args) on IDA's main thread, blocking until done.
     Temporarily enables batch mode to suppress all dialogs."""
@@ -63,7 +69,10 @@ def run_in_ida(fn, *args, write=False):
 
     mode = MFF_WRITE if write else MFF_READ
     ida_kernwin.execute_sync(_run, mode)
-    ev.wait()
+    if not ev.wait(IDA_SYNC_TIMEOUT):
+        raise TimeoutError(
+            f'IDA main thread did not run callback within {IDA_SYNC_TIMEOUT}s'
+        )
     if exc[0]:
         raise exc[0]
     return result[0]

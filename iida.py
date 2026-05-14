@@ -115,12 +115,44 @@ class IdaMcpPlugMod(idaapi.plugmod_t):
             ida_kernwin.msg("[iida-mcp] Not connected\n")
 
     def _init_network(self):
+        # Force-reload iida_core submodules so edits to *.py take effect on
+        # Alt+Shift+I restart without quitting IDA. Order matters: leaves first.
+        import importlib
+        import sys
+        for _name in (
+            'iida_core.thread_safe',
+            'iida_core.protocol',
+            'iida_core.registry',
+            'iida_core.cache',
+            'iida_core.kdriver',
+            'iida_core.driver_loader',
+            'iida_core.router',
+            'iida_core.worker',
+            'iida_core.server',
+            'iida_core.tools',
+        ):
+            mod = sys.modules.get(_name)
+            if mod is not None:
+                try:
+                    importlib.reload(mod)
+                except Exception as _ex:
+                    ida_kernwin.msg(f"[iida-mcp] reload {_name} failed: {_ex}\n")
+
         from iida_core.server import McpServer, try_bind_master, MCP_PORT
         from iida_core.worker import Worker
         from iida_core.registry import FileEntry
         from iida_core import tools
         from iida_core.thread_safe import read as ida_read
         from iida_core.cache import get_cache
+        from iida_core.driver_loader import ensure_driver_loaded
+
+        # Kernel driver: auto-install via UAC if not already running.
+        # Idempotent — only prompts the first time after a reboot.
+        try:
+            drv_ok, drv_msg = ensure_driver_loaded()
+            ida_read(lambda: ida_kernwin.msg(f"[iida-mcp] kernel driver: {drv_msg}\n"))
+        except Exception as ex:
+            ida_read(lambda: ida_kernwin.msg(f"[iida-mcp] driver loader error: {ex}\n"))
 
         file_info = ida_read(_get_file_info)
 
