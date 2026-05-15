@@ -8,7 +8,7 @@
 
 This MCP is primarily designed for x86/x86-64 executables and the corresponding IDA capabilities. For other needs, please open an issue.
 
-- 79 MCP tools
+- 77 MCP tools
 - Mainly compatible with IDA 8+, including IDA 9.x
 - Multi-IDA instance routing
 - Optional Windows kernel driver support
